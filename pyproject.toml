@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nowwam"
+version = "0.1.0"
+description = "PyTorch inference and evaluation for NowWAM"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+  "torch==2.7.1", "torchvision==0.22.1", "transformers==4.56.1",
+  "diffusers==0.39.0", "numpy==1.26.4", "Pillow==12.0.0",
+  "einops==0.8.1", "safetensors==0.8.0", "huggingface-hub==0.36.2",
+  "accelerate==1.12.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["nowwam*", "eval*"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
