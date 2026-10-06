@@ -96,9 +96,6 @@ We thank the authors of [FLUX.2](https://github.com/black-forest-labs/flux2),
 [RoboCasa GR1](https://github.com/robocasa/robocasa-gr1-tabletop-tasks), and
 [robosuite](https://github.com/ARISE-Initiative/robosuite) for their open-source work.
 
-We thank Google's [TPU Research Cloud (TRC)](https://sites.research.google/trc/about/)
-program for providing TPU compute resources.
-
 ImageWAM-derived code retains Copyright (c) 2026 Yuyang "Alice.L" and its
 [MIT license](LICENSE). Third-party code, models and assets retain their
 respective licenses; NowWAM checkpoint licenses are included on Hugging Face.
