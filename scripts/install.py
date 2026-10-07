@@ -14,7 +14,6 @@ from assets import (
     apply_source_patch,
     download,
     extract_zip,
-    manifest,
     patch_dial,
     patch_robocasa,
     prepare_libero,
@@ -24,10 +23,9 @@ from assets import (
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / "assets"
-MODELS = ("Klein-LIBERO", "ZImage-LIBERO", "Klein-RoboCasa-100shot")
+MODELS = ("Klein-LIBERO", "Klein-RoboCasa-100shot")
 HF_REVISION = "679cdcdd10346130dc1f22bff3455822d3e8d61d"
 QWEN_REVISION = "1cfa9a7208912126459214e8b04321603b3df60c"
-ZIMAGE_REVISION = "04cc4abb7c5069926f75c9bfde9ef43d49423021"
 LIBERO_REVISION = "4976dc30028e805ff8094b55501d532c48fec182"
 LIBERO_ASSET_REVISION = "dd2bd61b7d9a6fef1abc52d606e983b41886a149"
 SOURCES = {
@@ -262,7 +260,7 @@ def prepare_models(python, models):
         "vocab.json",
         "tokenizer.model",
     )
-    roots = {}
+    prepared = set()
     for model in models:
         hf(
             python,
@@ -272,39 +270,23 @@ def prepare_models(python, models):
             "--include",
             f"{model}/*",
         )
-        if model == "ZImage-LIBERO":
-            vae = ASSETS / "Z-Image"
-            hf(
-                python,
-                "Tongyi-MAI/Z-Image",
-                vae,
-                ZIMAGE_REVISION,
-                "--include",
-                "vae/*",
-                "transformer/config.json",
-            )
-        else:
-            hf(
-                python,
-                "black-forest-labs/FLUX.2-dev",
-                ASSETS / "flux2",
-                "26afe3a78bb242c0a8bb181dcc8937bb16e5c66c",
-                "--include",
-                "ae.safetensors",
-            )
-            vae = ASSETS / "flux2/ae.safetensors"
-            if sha256(vae) != "868fe7b343cc8f3a19dbcfcafbc3d5f888802be3f89bd81b65b3621a066ce8f3":
-                raise ValueError("Unexpected Klein VAE")
+        hf(
+            python,
+            "black-forest-labs/FLUX.2-dev",
+            ASSETS / "flux2",
+            "26afe3a78bb242c0a8bb181dcc8937bb16e5c66c",
+            "--include",
+            "ae.safetensors",
+        )
+        vae = ASSETS / "flux2/ae.safetensors"
+        if sha256(vae) != "868fe7b343cc8f3a19dbcfcafbc3d5f888802be3f89bd81b65b3621a066ce8f3":
+            raise ValueError("Unexpected Klein VAE")
         benchmark = "robocasa" if "RoboCasa" in model else "libero"
-        if benchmark not in roots:
-            roots[benchmark] = prepare_simulator(python, benchmark)
-            run(python, ROOT / "scripts/check_sim.py", benchmark)
+        if benchmark not in prepared:
+            prepare_simulator(python, benchmark)
+            prepared.add(benchmark)
             if benchmark == "robocasa":
                 (ASSETS / "robocasa-download.complete").touch()
-        manifest(
-            [vae, ASSETS / "Qwen3-4B", ASSETS / "sources/flux2", *roots[benchmark]],
-            ASSETS / f"{model}-manifest.json",
-        )
         run(python, "-m", "eval", model, "--limit", "1")
 
 
@@ -324,13 +306,13 @@ def main():
     ):
         parser.error("Use Python 3.11 on x86-64 Linux")
     if not shutil.which("git"):
-        parser.error("Install git first; see SETUP.md")
+        parser.error("Install git first; see README.md")
     if not args.dependencies_only:
         for name in ("libGL.so.1", "libEGL.so.1", "libglib-2.0.so.0"):
             try:
                 ctypes.CDLL(name)
             except OSError:
-                parser.error(f"Missing system library {name}; see SETUP.md")
+                parser.error(f"Missing system library {name}; see README.md")
         run("nvidia-smi")
     models = MODELS if args.model == "all" else (args.model,)
     python = install_dependencies(models)

@@ -15,7 +15,11 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["nowwam*", "eval*"]
+include = ["nowwam*", "eval*", "training*"]
+
+[tool.setuptools.package-data]
+training = ["*.json"]
+"training._core" = ["LICENSE.Apache-2.0"]
 
 [tool.ruff]
 line-length = 100

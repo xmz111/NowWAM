@@ -38,23 +38,13 @@ def lane_indices(case_count: int, lanes: int, lane: int) -> range:
     return range(lane, case_count, lanes)
 
 
-def libero_action_seed(profile: str, canonical_index: int, control_step: int) -> int:
-    """Select a documented noise protocol; the caller also selects its RNG.
-
-    zimage_jax: NumPy PCG64, then float32 conversion, as in the corrected
-    Z-Image 10,030-case run. The divisor records historical JAX sharding.
-    klein_torch_reference: CPU torch.Generator, as in the 87.6471% run;
-    it is not the JAX per-case noise protocol.
-    """
+def libero_action_seed(canonical_index: int, control_step: int) -> int:
+    """Klein action-noise seed; control steps exclude simulator warmup."""
     if type(canonical_index) is not int or not 0 <= canonical_index < 10030:
         raise ValueError("canonical_index must identify a full-manifest case")
     if type(control_step) is not int or control_step < 0:
         raise ValueError("control_step excludes warmup and must be nonnegative")
-    if profile == "zimage_jax":
-        return (canonical_index // 32) * 1000 + control_step
-    if profile == "klein_torch_reference":
-        return control_step
-    raise ValueError(f"Unknown action-noise profile: {profile}")
+    return control_step
 
 
 def robocasa_action_seed(task: str, seed: int, control_step: int) -> int:

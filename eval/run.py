@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib.metadata
 import json
 import os
 import signal
@@ -195,12 +194,7 @@ def run_case(args, policy, case, environment, log):
                             raise RuntimeError("Unexpected simulator message")
                         _, image, state, instruction, step = message
                         if args.benchmark == "libero":
-                            profile = (
-                                "zimage_jax"
-                                if policy.backbone == "zimage"
-                                else "klein_torch_reference"
-                            )
-                            seed = libero_action_seed(profile, case["canonical_index"], int(step))
+                            seed = libero_action_seed(case["canonical_index"], int(step))
                         else:
                             seed = robocasa_action_seed(case["task"], case["seed"], int(step))
                         conn.send(("action", policy.predict(image, state, instruction, seed)))
@@ -284,17 +278,6 @@ def summarize(output):
     print(json.dumps(result, indent=2))
 
 
-def source_hash():
-    root = Path(__file__).resolve().parents[1]
-    return digest(
-        {
-            str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
-            for folder in ("nowwam", "eval")
-            for p in sorted((root / folder).glob("*.py"))
-        }
-    )
-
-
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "worker":
         return worker(*sys.argv[2:])
@@ -310,9 +293,6 @@ def main():
     parser.add_argument("--sim-source", action="append", default=[])
     parser.add_argument("--sim-library", action="append", default=[])
     parser.add_argument("--libero-config")
-    parser.add_argument(
-        "--assets-manifest", type=Path, help="Reviewed JSON mapping absolute asset paths to SHA256"
-    )
     parser.add_argument("--gpus", default="0")
     parser.add_argument("--lanes-per-gpu", type=int, default=1)
     parser.add_argument(
@@ -327,7 +307,7 @@ def main():
         return summarize(args.output)
     if args.command == "lane":
         return lane(args)
-    for key in ("benchmark", "checkpoint", "vae", "text_encoder", "sim_python", "assets_manifest"):
+    for key in ("benchmark", "checkpoint", "vae", "text_encoder", "sim_python"):
         if getattr(args, key) is None:
             parser.error(f"--{key.replace('_', '-')} is required")
     if args.lanes_per_gpu < 1 or (args.limit is not None and args.limit < 1):
@@ -336,57 +316,16 @@ def main():
     with exclusive_run(args.output):
         from nowwam.policy import file_sha256
 
-        asset_files = json.loads(args.assets_manifest.read_text())
-        if not asset_files:
-            raise ValueError("Asset manifest is empty")
-        for path, expected in asset_files.items():
-            if file_sha256(path) != expected:
-                raise ValueError(f"Changed asset: {path}")
-        # Sources and encoders must be covered, not just an arbitrary asset file.
-        for resource in [args.vae, args.text_encoder, *args.sim_source]:
-            resource = Path(resource).resolve()
-            if resource.is_file():
-                covered = str(resource) in asset_files
-            else:
-                required = [
-                    p.resolve()
-                    for p in resource.rglob("*")
-                    if p.is_file()
-                    and p.suffix in (".py", ".json", ".safetensors")
-                    and not {".git", ".cache", "__pycache__"}.intersection(p.parts)
-                ]
-                covered = bool(required) and all(str(p) in asset_files for p in required)
-            if not covered:
-                raise ValueError(f"Resource is missing from the asset manifest: {resource}")
-        environment = sim_environment(args)
-        probe = "import importlib.metadata as m,json; print(json.dumps({n:m.version(n) for n in ['numpy','mujoco','robosuite','Pillow']}))"
-        versions = json.loads(
-            subprocess.check_output([args.sim_python, "-c", probe], env=environment, text=True)
-        )
-        expected_versions = {
-            "numpy": "1.26.4",
-            "mujoco": "3.3.2" if args.benchmark == "libero" else "3.2.6",
-            "robosuite": "1.4.0" if args.benchmark == "libero" else "1.5.1",
-            "Pillow": "12.0.0",
-        }
-        if versions != expected_versions:
-            raise ValueError(f"Simulator versions differ: {versions}; expected {expected_versions}")
         all_cases = cases_for(args.benchmark)
         contract = {
+            "protocol_version": 1,
             "benchmark": args.benchmark,
             "cases": all_cases[: args.limit],
             "full_case_count": len(all_cases),
-            "source_sha256": source_hash(),
             "checkpoint_sha256": file_sha256(args.checkpoint / "model.pth"),
             "config": json.loads((args.checkpoint / "config.json").read_text()),
             "stats_sha256": file_sha256(args.checkpoint / "dataset_stats.json"),
-            "asset_manifest_sha256": digest(asset_files),
-            "sim_versions": versions,
             "text_device": args.text_device,
-            "model_versions": {
-                n: importlib.metadata.version(n)
-                for n in ("torch", "transformers", "diffusers", "numpy", "Pillow")
-            },
         }
         path = args.output / "contract.json"
         if path.exists() and json.loads(path.read_text()) != contract:

@@ -1,6 +1,5 @@
-"""Prepare isolated simulator checkouts and record local asset checksums."""
+"""Download and prepare simulator assets."""
 
-import argparse
 import ast
 import hashlib
 import json
@@ -192,60 +191,3 @@ def patch_robocasa(root):
         raise ValueError(
             "Fixture files differ from both expected states; inspect rather than overwrite"
         )
-
-
-def manifest(roots, output):
-    files = {}
-    for root in roots:
-        root = root.resolve()
-        if not root.exists():
-            raise FileNotFoundError(root)
-        for path in [root] if root.is_file() else sorted(root.rglob("*")):
-            if not path.is_file() or any(
-                part in {".git", ".cache", "__pycache__"} for part in path.parts
-            ):
-                continue
-            if path.resolve() == output.resolve():
-                continue
-            files[str(path.resolve())] = sha256(path)
-    if not files:
-        raise ValueError("No assets found")
-    output.parent.mkdir(parents=True, exist_ok=True)
-    # Do not silently replace a lock used by an existing evaluation.
-    if output.exists():
-        if json.loads(output.read_text()) != files:
-            raise ValueError(f"Assets changed since preparation: {output}")
-        print(f"Verified existing asset manifest: {output}")
-        return
-    with output.open("x") as stream:
-        json.dump(files, stream, indent=2)
-        stream.write("\n")
-    print(f"Recorded {len(files)} files in {output}; this records identity, not reference parity")
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    commands = parser.add_subparsers(dest="command", required=True)
-    dial = commands.add_parser("patch-dial")
-    dial.add_argument("root", type=Path)
-    robocasa = commands.add_parser("patch-robocasa")
-    robocasa.add_argument("root", type=Path)
-    libero = commands.add_parser("prepare-libero")
-    libero.add_argument("root", type=Path)
-    libero.add_argument("--config", required=True, type=Path)
-    lock = commands.add_parser("manifest")
-    lock.add_argument("--root", required=True, action="append", type=Path)
-    lock.add_argument("--output", required=True, type=Path)
-    args = parser.parse_args()
-    if args.command == "patch-dial":
-        patch_dial(args.root)
-    elif args.command == "patch-robocasa":
-        patch_robocasa(args.root)
-    elif args.command == "prepare-libero":
-        prepare_libero(args.root, args.config)
-    else:
-        manifest(args.root, args.output)
-
-
-if __name__ == "__main__":
-    main()

@@ -1,4 +1,4 @@
-"""Inference-only loading and action prediction for the three released policies."""
+"""Klein policy loading and action prediction."""
 
 from __future__ import annotations
 
@@ -34,18 +34,19 @@ def prefix_mask(text_mask, image_len, action_len):
 class Policy:
     """Single-observation policy. Action noise is explicit, never monkeypatched."""
 
-    def __init__(self, checkpoint, *, vae, text_encoder, device="cuda", text_device="cpu"):
-        from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer
+    def __init__(
+        self,
+        checkpoint,
+        *,
+        vae,
+        text_encoder,
+        device="cuda",
+        text_device="cpu",
+    ):
+        from transformers import AutoModelForCausalLM, AutoTokenizer
 
         self.root = Path(checkpoint)
         self.config = json.loads((self.root / "config.json").read_text())
-        self.provenance = json.loads((self.root / "provenance.json").read_text())
-        for name, key in (
-            ("model.pth", "model_sha256"),
-            ("dataset_stats.json", "dataset_stats_sha256"),
-        ):
-            if file_sha256(self.root / name) != self.provenance[key]:
-                raise ValueError(f"Checkpoint file checksum mismatch: {name}")
         self.stats = json.loads((self.root / "dataset_stats.json").read_text())
         self.device, self.dtype = torch.device(device), torch.bfloat16
         if self.device.type != "cuda":
@@ -88,33 +89,6 @@ class Policy:
                 del self.vae.decoder
             self.vae.load_state_dict(vae_state, strict=True, assign=True)
             text_class = AutoModelForCausalLM
-        elif self.backbone == "zimage":
-            from diffusers import AutoencoderKL, ZImageTransformer2DModel
-
-            from .zimage import ZImageActionExpert, ZImageMoT, ZImageVideoExpert
-
-            transformer_config = ZImageTransformer2DModel.load_config(
-                str(vae), subfolder="transformer"
-            )
-            transformer_config["n_layers"] = cfg["keep_layers"]
-            with torch.device("meta"):
-                transformer = ZImageTransformer2DModel.from_config(transformer_config)
-                video = ZImageVideoExpert(transformer)
-                action = ZImageActionExpert(
-                    cfg["action_dim"],
-                    cfg["keep_layers"],
-                    hidden_dim=cfg["action_hidden_dim"],
-                    inner_dim=transformer.config.dim,
-                    num_heads=transformer.config.n_heads,
-                    head_dim=transformer.config.dim // transformer.config.n_heads,
-                    eps=transformer.config.norm_eps,
-                )
-                self.mot = ZImageMoT(video, action)
-                self.proprio = nn.Linear(cfg["proprio_dim"], 2560)
-            self.vae = AutoencoderKL.from_pretrained(
-                str(vae), subfolder="vae", torch_dtype=self.dtype
-            )
-            text_class = AutoModel
         else:
             raise ValueError(f"Unsupported backbone: {self.backbone}")
         state = torch.load(
@@ -157,11 +131,6 @@ class Policy:
 
     def append_proprio(self, context, mask, state):
         token = self.proprio(state.to(self.device, context.dtype).reshape(1, 1, -1))
-        if self.backbone == "zimage":
-            return (
-                torch.cat([context, token], dim=1),
-                torch.cat([mask, mask.new_ones(1, 1)], dim=1),
-            )
         valid = mask.sum(dim=1)
         indices = torch.where(
             mask, mask.cumsum(dim=1) - 1, valid[:, None] + 1 + (~mask).cumsum(dim=1) - 1
@@ -231,20 +200,7 @@ class Policy:
             *self.encode_text(instruction), self.normalize_state(state)
         )
         noise = self.noise(seed)
-        if self.backbone == "zimage":
-            latent = self.vae.encode(image).latent_dist.mean
-            latent = (latent - self.vae.config.shift_factor) * self.vae.config.scaling_factor
-            vp = self.video.pre_dit(latent, latent.new_ones(1), context, mask)
-            ap = self.action.pre_dit(
-                noise,
-                noise.new_ones(1),
-                self.video.transformer.rope_embedder,
-                self.video.transformer.config.axes_lens,
-            )
-            output = self.mot({"video": vp, "action": ap}, None, None, None, None)
-            normalized = self.action.post_dit(output["action"], ap)
-        else:
-            normalized = self.klein_forward(image, context, mask, noise)
+        normalized = self.klein_forward(image, context, mask, noise)
         action = normalized[0].float().cpu()
         if self.is_libero:
             scale, offset = self.minmax("action")

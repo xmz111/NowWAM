@@ -1,0 +1,306 @@
+{
+  "output_dir": "outputs/libero",
+  "batch_size": 16,
+  "num_workers": 8,
+  "prefetch_factor": 2,
+  "persistent_workers": true,
+  "lr_scheduler_type": "constant",
+  "learning_rate": 0.0001,
+  "warmup_steps": 2110,
+  "num_epochs": 9,
+  "max_steps": 42210,
+  "log_every": 10,
+  "save_every": 4690,
+  "keep_latest_state_only": true,
+  "eval_every": 1000000,
+  "eval_num_inference_steps": 1,
+  "eval_num_samples": 8,
+  "gradient_accumulation_steps": 1,
+  "mixed_precision": "bf16",
+  "seed": 42,
+  "max_grad_norm": 1.0,
+  "weight_decay": 0.0,
+  "resume": null,
+  "ema_decay": 0.9999,
+  "ema_device": "cuda",
+  "ema_update_every": 1,
+  "wandb": {
+    "enabled": false
+  },
+  "data": {
+    "train": {
+      "_target_": "training._core.datasets.lerobot.robot_video_dataset.RobotVideoDataset",
+      "dataset_dirs": [
+        "data/libero_spatial_no_noops_lerobot",
+        "data/libero_object_no_noops_lerobot",
+        "data/libero_goal_no_noops_lerobot",
+        "data/libero_10_no_noops_lerobot"
+      ],
+      "shape_meta": {
+        "images": [
+          {
+            "key": "image",
+            "raw_shape": [
+              3,
+              512,
+              512
+            ],
+            "shape": [
+              3,
+              224,
+              224
+            ]
+          },
+          {
+            "key": "wrist_image",
+            "raw_shape": [
+              3,
+              512,
+              512
+            ],
+            "shape": [
+              3,
+              224,
+              224
+            ]
+          }
+        ],
+        "action": [
+          {
+            "key": "default",
+            "raw_shape": 7,
+            "shape": 7
+          }
+        ],
+        "state": [
+          {
+            "key": "default",
+            "raw_shape": 8,
+            "shape": 8
+          }
+        ]
+      },
+      "num_frames": 17,
+      "global_sample_stride": 1,
+      "action_video_freq_ratio": 1,
+      "video_size": [
+        224,
+        448
+      ],
+      "camera_key": null,
+      "val_set_proportion": 0.0,
+      "is_training_set": true,
+      "skip_padding_as_possible": false,
+      "concat_multi_camera": "horizontal",
+      "video_augmentation": {
+        "_target_": "training._core.datasets.lerobot.transforms.image.VideoAugmentation",
+        "p": 0.65,
+        "augment_types": [
+          "corrupt_only",
+          "color_only",
+          "both",
+          "both"
+        ],
+        "color_jitter": {
+          "brightness": 0.3,
+          "contrast": 0.3,
+          "saturation": 0.25,
+          "hue": 0.04
+        },
+        "gamma": {
+          "range": [
+            0.8,
+            1.25
+          ]
+        },
+        "gaussian_noise": {
+          "std": 0.015
+        },
+        "random_resized_crop": {
+          "scale": [
+            0.92,
+            1.0
+          ],
+          "ratio": "preserve"
+        },
+        "rotate": {
+          "degrees": 8.0,
+          "fill": "mean"
+        },
+        "exposure": {
+          "ev_range": [
+            -0.25,
+            0.25
+          ]
+        }
+      },
+      "require_text_cache": false,
+      "endpoint_frames_only": true,
+      "qwen_text_cache_dir": null,
+      "qwen_context_len": 128,
+      "pretrained_norm_stats": null,
+      "processor": {
+        "_target_": "training._core.datasets.lerobot.processors.imagewam_processor.ImageWAMProcessor",
+        "shape_meta": {
+          "images": [
+            {
+              "key": "image",
+              "raw_shape": [
+                3,
+                512,
+                512
+              ],
+              "shape": [
+                3,
+                224,
+                224
+              ]
+            },
+            {
+              "key": "wrist_image",
+              "raw_shape": [
+                3,
+                512,
+                512
+              ],
+              "shape": [
+                3,
+                224,
+                224
+              ]
+            }
+          ],
+          "action": [
+            {
+              "key": "default",
+              "raw_shape": 7,
+              "shape": 7
+            }
+          ],
+          "state": [
+            {
+              "key": "default",
+              "raw_shape": 8,
+              "shape": 8
+            }
+          ]
+        },
+        "num_obs_steps": 17,
+        "image_obs_steps": 2,
+        "num_output_cameras": 2,
+        "action_output_dim": 7,
+        "proprio_output_dim": 8,
+        "delta_action_dim_mask": {
+          "default": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            false
+          ]
+        },
+        "action_state_transforms": null,
+        "use_stepwise_action_norm": false,
+        "norm_default_mode": "min/max",
+        "norm_exception_mode": null,
+        "action_state_merger": {
+          "_target_": "training._core.datasets.lerobot.transforms.action_state_merger.ConcatLeftAlign"
+        },
+        "train_transforms": [
+          {
+            "_target_": "training._core.datasets.lerobot.transforms.image.ToTensor"
+          },
+          {
+            "_target_": "torchvision.transforms.Resize",
+            "size": [
+              224,
+              224
+            ]
+          }
+        ],
+        "val_transforms": [
+          {
+            "_target_": "training._core.datasets.lerobot.transforms.image.ToTensor"
+          },
+          {
+            "_target_": "torchvision.transforms.Resize",
+            "size": [
+              224,
+              224
+            ]
+          }
+        ]
+      },
+      "text_embedding_cache_dir": null,
+      "context_len": 128,
+      "qwen_text_cache_format": "qwen3_flux2"
+    }
+  },
+  "model": {
+    "_target_": "training._core.runtime.create_imagewam_flux2_klein",
+    "flux2_src_path": null,
+    "flux2_model_path": "assets/FLUX.2-klein-base-4B/flux-2-klein-base-4b.safetensors",
+    "ae_model_path": "assets/FLUX.2-dev/ae.safetensors",
+    "variant": "klein-base-4b",
+    "qwen3_model_spec": "assets/Qwen3-4B",
+    "qwen_context_len": 128,
+    "load_text_encoder": true,
+    "proprio_dim": 8,
+    "mot_checkpoint_mixed_attn": true,
+    "mot_gqa_implementation": "repeat",
+    "mot_force_flash_attention": false,
+    "pack_proprio_after_text": true,
+    "action_dit_pretrained_path": "assets/action_init.pt",
+    "flux2_lora_config": {
+      "enabled": false
+    },
+    "action_dit_config": {
+      "action_dim": 7,
+      "hidden_dim": 1024,
+      "num_heads": 24,
+      "attn_head_dim": 128,
+      "num_layers_double": 5,
+      "num_layers_single": 20,
+      "mlp_ratio": 4.0,
+      "max_action_horizon": 64,
+      "use_gradient_checkpointing": true
+    },
+    "video_scheduler": {
+      "train_shift": 5.0,
+      "infer_shift": 5.0,
+      "num_train_timesteps": 1000
+    },
+    "action_scheduler": {
+      "train_shift": 5.0,
+      "infer_shift": 5.0,
+      "num_train_timesteps": 1000
+    },
+    "loss": {
+      "lambda_video": 0.5,
+      "lambda_action": 1.0
+    },
+    "dift_mode": true,
+    "action_regression": true,
+    "dift_tshift": 0.25,
+    "keep_double": 5,
+    "keep_single": 10,
+    "compile_backbone": false,
+    "frozen_qwen_dtype": "bf16",
+    "frozen_vae_dtype": "bf16"
+  },
+  "save_epoch_weights": true,
+  "save_epoch_weights_from": 5,
+  "ema_shard_across_ranks": true,
+  "model_parameter_dtype": "fp32",
+  "optimizer_foreach": false,
+  "ddp_gradient_as_bucket_view": true,
+  "ema_decays": [
+    0.9999
+  ],
+  "ema_balance_shards": true,
+  "ema_from_zero_master": false,
+  "save_final_checkpoint": true,
+  "maintain_ckptlast": true
+}
