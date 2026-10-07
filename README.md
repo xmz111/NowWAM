@@ -150,17 +150,4 @@ setup above, evaluate an export using `.venv`, not `.venv-train`:
 
 ## Acknowledgements
 
-Our implementation builds on [ImageWAM](https://github.com/yuyangalin/ImageWAM).
-We thank the authors of [FLUX.2](https://github.com/black-forest-labs/flux2),
-[Qwen](https://github.com/QwenLM/Qwen3),
-[Diffusers](https://github.com/huggingface/diffusers),
-[LIBERO-Plus](https://github.com/sylvestf/LIBERO-plus),
-[DIAL](https://github.com/xpeng-robotics/DIAL),
-[RoboCasa GR1](https://github.com/robocasa/robocasa-gr1-tabletop-tasks), and
-[robosuite](https://github.com/ARISE-Initiative/robosuite) for their open-source work.
-
-ImageWAM-derived code retains Copyright (c) 2026 Yuyang "Alice.L" and its
-[MIT license](LICENSE). Third-party code, models and assets retain their
-respective licenses; NowWAM checkpoint licenses are included on Hugging Face.
-Training includes adapted LeRobot and NVIDIA utilities with their original
-copyright notices and [Apache-2.0 license](training/_core/LICENSE.Apache-2.0).
+We thank FastWAM and [ImageWAM](https://github.com/yuyangalin/ImageWAM) for their open-source work, and TRC for compute support.
