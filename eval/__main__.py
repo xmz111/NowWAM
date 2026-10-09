@@ -1,4 +1,4 @@
-"""Evaluate a released model or a LIBERO training export."""
+"""Evaluate a released model or a training export."""
 
 import argparse
 import json
@@ -68,7 +68,7 @@ def evaluation_command(model, *, gpus="0", lanes=1, limit=None, output=None, che
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("model", help="Released model name or LIBERO training export directory")
+    parser.add_argument("model", help="Released model name or training export directory")
     parser.add_argument("--gpus", default="0", help="Visible GPU indices, e.g. 0,1")
     parser.add_argument("--lanes", type=int, default=1, help="Parallel lanes per GPU")
     parser.add_argument("--limit", type=int, help="Run a smoke-test prefix instead of the full set")
@@ -78,9 +78,10 @@ def main():
         if args.model not in MODELS:
             args.checkpoint = Path(args.model)
             config = json.loads((args.checkpoint / "config.json").read_text())
-            if (config.get("backbone"), config.get("action_dim")) != ("klein", 7):
-                raise ValueError("Training exports must be Klein LIBERO checkpoints")
-            args.model = "Klein-LIBERO"
+            models = {7: "Klein-LIBERO", 47: "Klein-RoboCasa-100shot"}
+            if config.get("backbone") != "klein" or config.get("action_dim") not in models:
+                raise ValueError("Expected a Klein LIBERO or RoboCasa training export")
+            args.model = models[config["action_dim"]]
         command = evaluation_command(**vars(args))
     except (OSError, ValueError) as error:
         parser.error(str(error))

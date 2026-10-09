@@ -24,9 +24,9 @@
 
 NowWAM adapts pretrained generative models to robot control through
 current-observation denoising, without a separate future-target branch.
-We provide model weights, training and evaluation code.
+We provide model weights, data preparation, training and evaluation code.
 
-📦 [Klein weights](#checkpoints) · 🏋️ [LIBERO training](#training) · 🤖 [LIBERO-Plus & RoboCasa evaluation](#evaluation)
+📦 [Klein weights](#checkpoints) · 🏋️ [LIBERO & RoboCasa (100-shot) training](#training) · 🤖 [LIBERO-Plus & RoboCasa evaluation](#evaluation)
 
 ## Checkpoints
 
@@ -59,7 +59,7 @@ python -m eval Klein-LIBERO --limit 4
 The installer downloads the weights and assets, prepares the simulator, and
 runs a one-episode test. Replace `Klein-LIBERO` with `Klein-RoboCasa-100shot`
 to evaluate RoboCasa. Use `all` with the installer to prepare both checkpoints;
-evaluate each by name. Training code currently covers Klein on LIBERO.
+evaluate each by name.
 Simulator environments are selected automatically. Do not reinstall during a run.
 
 ## Evaluation
@@ -81,7 +81,7 @@ For results from an older evaluator, use a new directory with `--output outputs/
 ## Training
 
 Run from the repository root. Use four GPUs with DDP (tested on 4 × H200,
-141 GB each) and allow 300 GB for assets and checkpoints. Keep training in
+141 GB each) and allow 500 GB for data, assets and checkpoints. Keep training in
 its own environment; do not run `pip install -e .` inside it.
 Accept any required [base-model access terms](https://huggingface.co/black-forest-labs/FLUX.2-klein-base-4B)
 and the VAE terms above before downloading.
@@ -93,20 +93,12 @@ pip install -r requirements/train.txt
 hf auth login
 ```
 
-Download the [LIBERO v2.1 training data](https://huggingface.co/datasets/yuanty/LIBERO-fastwam)
-and base models once:
+Download the base models once; both training recipes use them:
 
 <details>
-<summary>Download commands</summary>
+<summary>Base-model download</summary>
 
 ```bash
-hf download yuanty/LIBERO-fastwam --repo-type dataset \
-  --revision ee018b997c430bb12b5bf3c892d744798c5a2f91 \
-  --include 'libero_*_no_noops_lerobot.tar.gz' --local-dir data/archives
-for suite in spatial object goal 10; do
-  tar -xzf "data/archives/libero_${suite}_no_noops_lerobot.tar.gz" -C data
-done
-
 hf download black-forest-labs/FLUX.2-klein-base-4B flux-2-klein-base-4b.safetensors \
   --revision a3b4f4849157f664bdbc776fd7453c2783562f4d --local-dir assets/FLUX.2-klein-base-4B
 hf download black-forest-labs/FLUX.2-dev ae.safetensors \
@@ -121,20 +113,44 @@ python -m training.prepare
 
 </details>
 
-Train with the recipe in [training/libero.json](training/libero.json):
+### LIBERO
+
+Download the [training data](https://huggingface.co/datasets/yuanty/LIBERO-fastwam) and train:
 
 ```bash
+hf download yuanty/LIBERO-fastwam --repo-type dataset \
+  --revision ee018b997c430bb12b5bf3c892d744798c5a2f91 \
+  --include 'libero_*_no_noops_lerobot.tar.gz' --local-dir data/archives
+for suite in spatial object goal 10; do
+  tar -xzf "data/archives/libero_${suite}_no_noops_lerobot.tar.gz" -C data
+done
 OMP_NUM_THREADS=4 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
   torchrun --standalone --nproc-per-node=4 -m training
 ```
 
-Repeat the training command to resume, or append `outputs/new-run` for a new run.
+### RoboCasa (100-shot)
 
-EMA exports are saved under `outputs/libero/exports/`. After the evaluation
-setup above, evaluate an export using `.venv`, not `.venv-train`:
+Prepare the RoboCasa simulator, then download and process the training data
+from `.venv-train`:
+
+```bash
+python3.11 scripts/install.py Klein-RoboCasa-100shot
+python -m training.robocasa_data
+OMP_NUM_THREADS=4 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+  torchrun --standalone --nproc-per-node=4 -m training.robocasa
+```
+
+Preparation downloads the [GR1 demonstrations](https://huggingface.co/datasets/nvidia/PhysicalAI-Robotics-GR00T-Teleop-Sim),
+uses episodes 0–99 per task, and prepares observations, actions, statistics and
+text features under `data/robocasa`.
+
+Both recipes use global batch 64 and 42,210 updates. Repeat the training command
+to resume, or append a new output directory for a new run. EMA policies are
+exported under `outputs/<benchmark>/exports/`. After evaluation setup, run:
 
 ```bash
 .venv/bin/python -m eval outputs/libero/exports/step_032830 --gpus 0,1 --lanes 2
+.venv/bin/python -m eval outputs/robocasa/exports/step_037520 --gpus 0,1 --lanes 2
 ```
 
 ## Citation
